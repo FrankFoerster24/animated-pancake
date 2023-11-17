@@ -1,0 +1,38 @@
+---
+name: encrypt secrets
+
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      secret:
+        description: "The Secret to Encrypt"
+        required: true
+        type: string
+      pubkey:
+        description: "Base64 encoded Public Key (in one line)"
+        required: true
+        type: string
+
+jobs:
+  encrypt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mask Secret
+        run: |
+          SECRET="$(jq '.inputs.secret' "${GITHUB_EVENT_PATH}")"
+          echo "::add-mask::${SECRET}"
+      - name: Dump Events
+        run: |
+          jq . "${GITHUB_EVENT_PATH}"
+      - name: Dump Public Key
+        run: |
+          echo "${{ inputs.pubkey }}" |base64 -d |tee pubkey.pem
+      - name: Encrypt Secrets
+        run: |
+          echo "${{ inputs.secret }}" |openssl pkeyutl -encrypt -inkey pubkey.pem -pubin |base64 |tee secret.enc.b64
+      - name: Archive Secret
+        uses: actions/upload-artifact@v3
+        with:
+          name: Secret
+          path: secret.enc.b64
+          retention-days: 1
